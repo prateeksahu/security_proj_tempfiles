@@ -1,0 +1,2 @@
+Compile Initial IR from crypto/examples/ folder
+clang -Xclang -load -Xclang ../../../llvm-pass-skeleton/build/skeleton/libSkeletonPass.* aes.c ../aes/aes_core.c 2> aes_IR
