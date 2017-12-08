@@ -8,79 +8,104 @@
 #include "llvm/Transforms/Utils/BasicBlockUtils.h"
 #include "iterator"
 #include "llvm/ADT/ilist.h"
+#include <vector>
+#include <map>
+
 using namespace llvm;
+using namespace std;
 
 namespace {
-  struct SkeletonPass : public FunctionPass {
-    static char ID;
-    SkeletonPass() : FunctionPass(ID) {}
 
-    virtual bool runOnFunction(Function &F) {
-      for (auto &B : F) {
-        errs() << "Basic block:\n";
-        bool duplicate = false; 
-        for (auto &I : B) {
-          auto *ci = dyn_cast<CallInst>(&I);
-          if (ci != NULL) {
-            // Insert at the point where the instruction `op` appears.
-            
-            errs() << ci->getCalledFunction()->getName() << "\n";
-            if (ci->getCalledFunction()->getName() == "aes_dummy"){
-              duplicate = true;
-            }
-            // Make a multiply with the same operands as `op`.
-            // Value *lhs = op->getOperand(0);
-            // Value *rhs = op->getOperand(1);
-            // Value *mul = builder.CreateMul(lhs, rhs);
+    struct SkeletonPass : public FunctionPass {
+        static char ID;
+        SkeletonPass() : FunctionPass(ID) {}
 
-            // Everywhere the old instruction was used as an operand, use our
-            // new multiply instruction instead.
-            // for (auto &U : op->uses()) {
-            //   User *user = U.getUser();  // A User is anything with operands.
-            //   user->setOperand(U.getOperandNo(), mul);
-            // }
+        virtual bool runOnFunction(Function &F) {
+            errs() << F.getName() << "\n";
+            for (auto &B : F) {
 
-            // We modified the code.
-            // return true;
-          }
-          if (auto *br = dyn_cast<TerminatorInst>(&I)){
-            duplicate = false;
-          }
-          if (duplicate){
-            if(auto *op = dyn_cast<CallInst>(&I)){
-              if(op->getCalledFunction()->getName() == "printf"){
-                errs() << "should duplicate here\n";
-//                IRBuilder<> builder(ci);
-                // builder.SetInsertPoint(&B, ++builder.GetInsertPoint());
-                auto new_inst = op->clone();
-//                op->getParent()->getInstList().push_back(new_inst);
-                  new_inst->insertBefore(&I);
-//                  op->getParent()->getInstList().insert(I, new_inst);
-                // new_inst->setName(ci->getName());
-                errs() << *(op->getArgOperand(0)) << "\n";
-                  if( ConstantExpr * pCE = dyn_cast<ConstantExpr>( op->getArgOperand(0))){
-                      errs() << *pCE << "\n";
-                    if( GlobalVariable * pGV = dyn_cast<GlobalVariable>( pCE->getOperand(0))){
-                        errs() << *pGV << "\n";
-                        if( ConstantArray * pCA = dyn_cast<ConstantArray>(pGV->getInitializer())){
-                            errs() << *pCA << "\n";
+                errs() << "Basic block:\n";
+                bool duplicate = false;
+                int count  = 0;
+                map<Instruction*, Instruction*> vars;
+                vector<Instruction *> duplicate_block;
+                bool skip = false;
+                for (auto &I : B) {
+
+                    if(!skip) {
+                        srand(time(NULL));
+                        int r_num = rand() % 2;
+
+
+                        auto *ci = dyn_cast<CallInst>(&I);
+
+                        if (ci != NULL) {
+
+                            // Insert at the point where the instruction `op` appears.
+
+                            errs() << ci->getCalledFunction()->getName() << "\n";
+                            if (ci->getCalledFunction()->getName() == "aes_dummy_start") {
+                                count = 0;
+                                duplicate = true;
+                                continue;
+                            }
+
+                            if (ci->getCalledFunction()->getName() == "aes_dummy_stop") {
+                                count = 0;
+                                duplicate = false;
+                                continue;
+                            }
                         }
-                    }
-                  }
-                // builder.Insert();
-                errs() << *op << "\n";
-                errs() << *new_inst << "\n";
-              }
-            }
-          }
-        }
 
-          B.dump();
-      }
+
+                        if (duplicate) {
+                            auto new_inst = I.clone();
+                            if (r_num == 0) {
+                                new_inst->insertBefore(&I);
+                            } else {
+                                new_inst->insertAfter(&I);
+                                skip = true;
+                            }
+                            vars[&I] = new_inst;
+                            errs() << "Inserted " << I << "and" << *new_inst << "\n";
+
+                            for (int i = 0; i < new_inst->getNumOperands(); i++) {
+                                auto *typ = new_inst->getOperand(i);
+                                Instruction *inst_op = dyn_cast<Instruction>(typ);
+                                if (inst_op != NULL) {
+                                    auto iter = vars.find(inst_op);
+                                    if (iter != vars.end()) {
+                                        errs() << "Found match " << *iter->second << "\n";
+                                        new_inst->setOperand(i, iter->second);
+                                    }
+                                }
+                                StringRef tvar = typ->getName();
+                                if(tvar!="")
+                                {
+                                    errs() << tvar << "\n";
+                                    auto replace_var = typ;
+                                    //Replace var here, should be simple enough
+                                }
+                                errs() << "New_Inst op replaced" << *typ << " with " << *new_inst->getOperand(i)
+                                       << "\n";
+                            }
+
+                            //new_inst->insertBefore(&I);
+
+                        }
+                    } else skip = false;
+
+
+                }
+
+                B.dump();
+            }
 
       // return false;
-    }
-  };
+
+        }
+
+    };
 }
 
 char SkeletonPass::ID = 0;
