@@ -30,6 +30,11 @@ namespace {
                 map<Instruction*, Instruction*> vars;
                 vector<Instruction *> duplicate_block;
                 bool skip = false;
+                if(F.getName() == "AES_set_encrypt_key")
+                {
+                    errs() << F.getName() << "\n";
+                    duplicate = true;
+                }
                 for (auto &I : B) {
 
                     if(!skip) {
@@ -39,6 +44,7 @@ namespace {
 
                         auto *ci = dyn_cast<CallInst>(&I);
 
+                        /*
                         if (ci != NULL) {
 
                             // Insert at the point where the instruction `op` appears.
@@ -56,16 +62,27 @@ namespace {
                                 continue;
                             }
                         }
-
+                        */
 
                         if (duplicate) {
                             auto new_inst = I.clone();
+                            //If the cloned instruction writes to a global, modify it's value
+
                             if (r_num == 0) {
                                 new_inst->insertBefore(&I);
                             } else {
                                 new_inst->insertAfter(&I);
                                 skip = true;
                             }
+
+                            auto t_var = I.getName();
+                            if(t_var!=""){
+                                errs() << t_var << "\n";
+                                auto dummy_name = t_var + "_dummy";
+                                new_inst->setName(dummy_name);
+                                errs() << "Name change " << t_var << " to " << new_inst->getName() << "\n";
+                            }
+
                             vars[&I] = new_inst;
                             errs() << "Inserted " << I << "and" << *new_inst << "\n";
 
@@ -79,10 +96,13 @@ namespace {
                                         new_inst->setOperand(i, iter->second);
                                     }
                                 }
-                                StringRef tvar = typ->getName();
-                                if(tvar!="")
+
+
+
+                                StringRef t_var = typ->getName();
+                                if(t_var!="")
                                 {
-                                    errs() << tvar << "\n";
+                                    errs() << t_var << "\n";
                                     auto replace_var = typ;
                                     //Replace var here, should be simple enough
                                 }
