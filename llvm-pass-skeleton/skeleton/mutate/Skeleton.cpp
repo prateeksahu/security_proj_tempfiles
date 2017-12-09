@@ -21,7 +21,8 @@ namespace {
         SkeletonPass() : FunctionPass(ID) {}
 
         virtual bool runOnFunction(Function &F) {
-            errs() << F.getName() << "\n";
+            srand(time(NULL));
+            errs() << F.getName() << "\n\n";
             for (auto &B : F) {
 
                 errs() << "Basic block:\n";
@@ -30,15 +31,13 @@ namespace {
                 map<Instruction*, Instruction*> vars;
                 vector<Instruction *> duplicate_block;
                 bool skip = false;
-                if(F.getName() == "AES_set_encrypt_key")
-                {
-                    errs() << F.getName() << "\n";
+                //if(F.getName() == "AES_set_encrypt_key")
+                //{
                     duplicate = true;
-                }
+                //}
                 for (auto &I : B) {
 
                     if(!skip) {
-                        srand(time(NULL));
                         int r_num = rand() % 2;
 
 
@@ -66,25 +65,26 @@ namespace {
 
                         if (duplicate) {
                             auto new_inst = I.clone();
-                            //If the cloned instruction writes to a global, modify it's value
 
                             if (r_num == 0) {
                                 new_inst->insertBefore(&I);
                             } else {
+                                //errs() << "Called insert after on " << *new_inst << "\n";
                                 new_inst->insertAfter(&I);
                                 skip = true;
                             }
 
                             auto t_var = I.getName();
                             if(t_var!=""){
-                                errs() << t_var << "\n";
+                                //Dummy variable created if a local variable is found
+                                //errs() << t_var << "\n";
                                 auto dummy_name = t_var + "_dummy";
                                 new_inst->setName(dummy_name);
                                 errs() << "Name change " << t_var << " to " << new_inst->getName() << "\n";
                             }
 
                             vars[&I] = new_inst;
-                            errs() << "Inserted " << I << "and" << *new_inst << "\n";
+                            //errs() << "Inserted " << I << "and" << *new_inst << "\n";
 
                             for (int i = 0; i < new_inst->getNumOperands(); i++) {
                                 auto *typ = new_inst->getOperand(i);
@@ -92,25 +92,26 @@ namespace {
                                 if (inst_op != NULL) {
                                     auto iter = vars.find(inst_op);
                                     if (iter != vars.end()) {
-                                        errs() << "Found match " << *iter->second << "\n";
+                                        //errs() << "OP " << *typ << "\n";
                                         new_inst->setOperand(i, iter->second);
                                     }
                                 }
 
-
-
-                                StringRef t_var = typ->getName();
-                                if(t_var!="")
-                                {
-                                    errs() << t_var << "\n";
-                                    auto replace_var = typ;
-                                    //Replace var here, should be simple enough
-                                }
-                                errs() << "New_Inst op replaced" << *typ << " with " << *new_inst->getOperand(i)
-                                       << "\n";
+                                //errs() << "New_Inst op replaced" << *typ << " with " << *new_inst->getOperand(i) << "\n";
                             }
 
-                            //new_inst->insertBefore(&I);
+                            //tAKE CARE OF STORES. needs WORK
+                            auto * alc_type = dyn_cast<StoreInst>(new_inst);
+                            if(alc_type != NULL)
+                            {
+                                auto *strc =  alc_type->getOperand(0);
+
+                                if(strc->getName() != "")
+                                {
+                                    new_inst->getOperand(0)->setName(strc->getName() + "_dummy");
+                                    errs() << "Replaced struct/var " << strc->getName() << " with " << new_inst->getOperand(0)->getName() << "\n";
+                                }
+                            }
 
                         }
                     } else skip = false;
